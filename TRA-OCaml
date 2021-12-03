@@ -1,0 +1,216 @@
+module type SETS =
+  sig
+    type 'a set
+    val empty : 'a set
+    val listToSet : 'a list -> 'a set
+    val setToList : 'a set -> 'a list
+    val member : 'a * 'a set -> bool
+    val addToSet : 'a * 'a set -> 'a set
+    val removeDuplicates : 'a list -> 'a set
+end;;
+
+module Set : SETS =
+  struct
+    type 'a set = 'a list
+    let empty = []
+    let rec member (v,s) =
+      match s with
+        [] -> false
+      | (i::t) -> (v=i) || (member(v,t))
+    let addToSet (v,s) =
+        if (member(v,s))
+        then s
+        else v::s
+    let rec removeDuplicates l =
+      match l with
+        [] -> []
+      | (h::t) -> if member(h,t)
+                  then removeDuplicates(t)
+                  else h::removeDuplicates(t)
+
+    let listToSet l = removeDuplicates l
+    let setToList s = s
+end;;
+
+let studentTable = ("Student",
+   ["Id";"Name";"Gender";"Course"],
+   Set.listToSet([["2";"Jim";"Male";"Geography"];
+   ["4";"Linnea";"Female";"Economics"];
+   ["7";"Steve";"Male";"Informatics"];
+   ["9";"Hannah";"Female";"Geography"]]));;
+
+let studentDatabase = [("Teacher", ["Id";"Name";"Gender";"Course"],
+                     Set.listToSet[["10";"Kalle";"Male";"Geography"];
+                                   ["11";"Felicia";"Female";"Economics"];
+                                   ["12";"Mattias";"Male";"Informatics"];
+                                   ["13";"Paula";"Female";"Geography"]]);
+                       ("Admin", ["Id";"Name";"Gender";"Course"],
+                   Set.listToSet[["14";"Kaspar";"Male";"Geography"];
+                                 ["15";"Maja";"Female";"Economics"];
+                                 ["16";"Danne";"Male";"Informatics"];
+                                 ["17";"Olivia";"Female";"Geography"]]);
+                     ("Student", ["Id";"Name";"Gender";"Course"],
+                    Set.listToSet[["2";"Jim";"Male";"Geography"];
+                                  ["4";"Linnea";"Female";"Economics"];
+                                  ["7";"Steve";"Male";"Informatics"];
+                                  ["9";"Hannah";"Female";"Geography"]])];;
+
+exception Error;;
+(*PROJECT*)
+
+(*funktionen "search" tar in en lista, en attributlista och ett set.
+l = listan vi skickar in, ex ["Name"; "Gender"]
+al = hela attributlistan i tabellen som ska matcha med det vi skickar in, i vårt fall
+["Id";"Name";"Gender";"Course"].
+set = hela setet / tabellen vi ska kolla *)
+
+let rec search(l,al,set) =
+  match(l,al,set) with
+    ([],al,set) -> []
+    | (h1::t1,h2::t2,h3::t3) -> if (h1=h2)
+                                then h3::search(t1,t2,t3)
+                                else search(l,t2,t3);;
+
+(* Fökjande funktion lägger in värdena som funktionen "search" genererar i ett nytt set. Dubbletter elimineras.*)
+
+let rec proejct_set(l,al,set) =
+  match(set) with
+    [] -> Set.listToSet([])
+  | (h::t) -> Set.addToSet(search(l,al,h), proejct_set(l,al,t));;
+
+(* Här säger vi att tableName ska innefatta ett namn på tabellen, en attributlista och ett set.*)
+
+let project(l, tableName) =
+  match tableName with
+    (n,al,set) -> (l, (proejct_set(l,al,Set.setToList(set))));;
+
+(* om första noden (h) i attributlistan al är detsamma som namnet på attribut a,
+lägger vi in det nya värdet av newA i svansen t. M.a.o "får" a härvid ett nytt namn.
+om inte, fogar vi in h tillbaka på sin plats och kallar på funktionen igen*)
+
+let rec search_attribute(a,newA,al) =
+  match al with
+    [] -> raise Error
+  | (h::t) -> if h=a
+              then newA::t
+              else h::search_attribute(a,newA,t);;
+
+(* Om tabellen har ett namn, en attributlista och ett set, så behåller vi namnet och
+kallar på föregående funktion för namnbytet. Föregående funktion tar in samma input som för
+funktionen "rename", d.v.s gamla attributnamnet, nya attributnamnet. Vi behåller även alla set under. *)
+
+let rec rename(a,newA,table) =
+  match table with
+    (_,[],_) -> raise Error
+  | (n,al,set) -> (search_attribute(a,newA,al), set);;
+
+(*RESTRICT vol.2*)
+
+
+
+(* första noden (h1, dvs första attributet i attributlistan) kollas/matchas med värde två
+(v2, dvs det attributnamn vi har skickat in). Därefter kollas v1 (den cell vi är intresserad av, ex. female)
+med h2, dvs första noden i vårt set. Om båda matchar returneras "true",
+annars false och då kallar vi på samma funktion igen men kollar med resten av listorna al och set(t1, t2). *)
+
+let rec match_values(v1,v2,al,set) =
+  match (al,set) with
+    ([],_) -> false
+  | (h1::t1,h2::t2) -> if (h1=v2)
+                       then (if v1=h2 then true else false)
+                       else match_values(v1,v2,t1,t2);;
+
+(* Om funktionen match_values returnerar "true", fogar vi in h
+(första noden i settet s) i vår nya lista och kollar på nästa nod genom att
+kalla på funktionen igen. Detta görs med funktionen nedan.
+Om inte, slopar vi h och kollar på nästa nod genom att kalla på funktionen igen*)
+
+let rec add_values(v2,v1,al,set) =
+  match set with
+    [] -> Set.listToSet([])
+  | (h::t) -> if match_values(v1,v2,al,h)
+              then Set.listToSet(h::Set.setToList(add_values(v2,v1,al,t)))
+              else add_values(v2,v1,al,t);;
+
+(*den sista funktionen är den funktion vi kommer kalla på.
+vi matchar table med ett namn (n), en attributlista (al), och ett set (s).
+*)
+
+let restrict (v2,v1,table) =
+  match table with
+    (n,al,set) -> (al,add_values(v2,v1,al,Set.setToList(set)));;
+
+(*TASK 2*)
+
+type relalg = Project of (string list * string)
+            | Rename of (string * string * string)
+            | Restrict of (string * string * string);;
+
+(*Summering: Funktionen hämtar rätt tabell i fråga*)
+
+let rec get_table (tablename,database) =
+  match database with
+    [] -> raise Error
+  | ((name,al,set)::t) -> if (name = tablename)
+                          then (name,al,set)
+                          else get_table(tablename,t);;
+
+(*funktionen tar in en databas och fogar samman denna med resultat-tabellen som vi har utfört vår önskade query på.*)
+
+let rec new_table(database,table) =
+  match (database,table) with
+    ([],table) -> [table]
+  | ((name,al,set)::t,(name2,al2,set2)) -> if name = name2
+                            then (name2,al2,set2)::t
+                            else (name,al,set)::new_table(t,table);;
+
+let return_correct_expression(name,result) =
+  match result with
+    (attribute,set) -> (name,attribute,set);;
+
+let eval (q, newtable, database) =
+    match q with
+       (Project (attribs, tablename))   ->  let ny = return_correct_expression(newtable, project(attribs, get_table(tablename,database))) in
+                                            new_table(database,ny)
+    |  (Rename (oldatrib, newatrib, tablename)) -> let ny2 = return_correct_expression(newtable, rename(oldatrib, newatrib, get_table(tablename,database))) in
+                                                   new_table(database,ny2)
+    |  (Restrict (atrib, value, tablename)) -> let ny3 = return_correct_expression(newtable, restrict(atrib, value, get_table(tablename,database))) in
+                                               new_table(database,ny3);;
+
+(* EXAMPLES *)
+
+(*Input*) project(["Id"; "Course"], studentTable);;
+(*Output*) string list * string list Set.set = (["Id"; "Course"], <abstr>)
+
+(*Input*) rename("Name", "FirstName", studentTable);;
+(*Output*)string list * string list Set.set = (["Id"; "FirstName"; "Gender"; "Course"], <abstr>)
+
+(*Input*) restrict("Gender", "Male", studentTable);;
+(*Output*)string list * string list Set.set = (["Id"; "Name"; "Gender"; "Course"], <abstr>)
+
+(*eval*)
+(*Input*) eval (Project(["Id"; "Course"],"Teacher"), "Id_Course", studentDatabase);;
+(*Output*)
+(string * string list * string list Set.set) list =
+[("Teacher", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Admin", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Student", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Id_Course", ["Id"; "Course"], <abstr>)]
+
+(*Input*) eval (Rename("Id", "StudId", "Student"), "Student_Updated", studentDatabase);;
+(*Output*)
+(string * string list * string list Set.set) list =
+[("Teacher", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Admin", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Student", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Student_Updated", ["StudId"; "Name"; "Gender"; "Course"], <abstr>)]
+
+(*Input*) eval (Restrict("Gender", "Female", "Admin"), "FeAdmin", studentDatabase);;
+(*Output*)
+(string * string list * string list Set.set) list =
+[("Teacher", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Admin", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("Student", ["Id"; "Name"; "Gender"; "Course"], <abstr>);
+ ("FeAdmin", ["Id"; "Name"; "Gender"; "Course"], <abstr>)]
+
+ (*RESTRICT vol.1*)
